@@ -213,25 +213,24 @@
           const date = new Date(year, monthIndex, i);
           const row = document.createElement("tr");
           row.innerHTML = `
-                    <td><input type="date" value="${
-                      date.toISOString().split("T")[0]
-                    }"></td>
-                    <td><select>${days
-                      .map(
-                        (day, index) =>
-                          `<option value="${index}" ${
-                            index === date.getDay() ? "selected" : ""
-                          }>${day}</option>`
-                      )
-                      .join("")}</select></td>
-                    ${employees
-                      .map(
-                        () =>
-                          `<td class="off" onclick="toggleStatus(this)">Off</td>`
-                      )
-                      .join("")}
-                    <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
-                `;
+            <td><input type="date" value="${
+              date.toISOString().split("T")[0]
+            }"></td>
+            <td><select>${days
+              .map(
+                (day, index) =>
+                  `<option value="${index}" ${
+                    index === date.getDay() ? "selected" : ""
+                  }>${day}</option>`
+              )
+              .join("")}</select></td>
+            ${employees
+              .map(
+                () => `<td class="off" onclick="toggleStatus(this)">Off</td>`
+              )
+              .join("")}
+            <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
+          `;
           document.getElementById("rosterBody").appendChild(row);
         }
       }
@@ -239,20 +238,15 @@
       function addRow() {
         const row = document.createElement("tr");
         row.innerHTML = `
-                <td><input type="date" onchange="updateDay(this)"></td>
-                <td><select>${days
-                  .map(
-                    (day, index) => `<option value="${index}">${day}</option>`
-                  )
-                  .join("")}</select></td>
-                ${employees
-                  .map(
-                    () =>
-                      `<td class="off" onclick="toggleStatus(this)">Off</td>`
-                  )
-                  .join("")}
-                <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
-            `;
+          <td><input type="date" onchange="updateDay(this)"></td>
+          <td><select>${days
+            .map((day, index) => `<option value="${index}">${day}</option>`)
+            .join("")}</select></td>
+          ${employees
+            .map(() => `<td class="off" onclick="toggleStatus(this)">Off</td>`)
+            .join("")}
+          <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
+        `;
         document.getElementById("rosterBody").appendChild(row);
       }
 
@@ -283,201 +277,162 @@
         ).map((row) => ({
           date: row.cells[0].firstElementChild.value,
           day: row.cells[1].firstElementChild.value,
-          shifts: Array.from(row.cells)
-            .slice(2, 6)
-            .map((cell) => cell.textContent),
+          status: Array.from(row.cells)
+            .slice(2, -1)
+            .map((cell) => (cell.classList.contains("work") ? "Work" : "Off")),
         }));
         localStorage.setItem(currentMonth, JSON.stringify(rosterData));
-        alert("Roster saved successfully.");
+        alert("Roster saved!");
       }
 
       function loadCurrentRoster() {
-        const savedCurrentMonth = localStorage.getItem("currentMonth");
-        if (savedCurrentMonth) {
-          currentMonth = savedCurrentMonth;
+        const roster = localStorage.getItem(currentMonth);
+        if (roster) {
+          const rosterData = JSON.parse(roster);
+          document.getElementById("rosterBody").innerHTML = rosterData
+            .map(
+              (data) => `
+              <tr>
+                <td><input type="date" value="${data.date}"></td>
+                <td><select>${days
+                  .map(
+                    (day, index) =>
+                      `<option value="${index}" ${
+                        index == data.day ? "selected" : ""
+                      }>${day}</option>`
+                  )
+                  .join("")}</select></td>
+                ${data.status
+                  .map(
+                    (status) =>
+                      `<td class="${status.toLowerCase()}" onclick="toggleStatus(this)">${status}</td>`
+                  )
+                  .join("")}
+                <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
+              </tr>
+            `
+            )
+            .join("");
           document.getElementById("currentMonth").textContent = currentMonth;
-          const rosterData = JSON.parse(localStorage.getItem(currentMonth));
-          if (rosterData) {
-            document.getElementById("rosterBody").innerHTML = "";
-            rosterData.forEach((row) => {
-              const tr = document.createElement("tr");
-              tr.innerHTML = `
-                            <td><input type="date" value="${row.date}"></td>
-                            <td><select>${days
-                              .map(
-                                (day, index) =>
-                                  `<option value="${index}" ${
-                                    index == row.day ? "selected" : ""
-                                  }>${day}</option>`
-                              )
-                              .join("")}</select></td>
-                            ${row.shifts
-                              .map(
-                                (shift) =>
-                                  `<td class="${shift.toLowerCase()}" onclick="toggleStatus(this)">${shift}</td>`
-                              )
-                              .join("")}
-                            <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
-                        `;
-              document.getElementById("rosterBody").appendChild(tr);
-            });
-          }
         }
       }
 
       function showPreviousRosters() {
         const modal = document.getElementById("previousRostersModal");
-        modal.style.display = "block";
         const monthSelector = document.getElementById("monthSelector");
         monthSelector.innerHTML = "";
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key !== "currentMonth") {
-            const option = document.createElement("option");
-            option.value = key;
-            option.textContent = key;
-            monthSelector.appendChild(option);
-          }
-        }
-        displaySelectedRoster();
+
+        Object.keys(localStorage).forEach((key) => {
+          const option = document.createElement("option");
+          option.value = key;
+          option.textContent = key;
+          monthSelector.appendChild(option);
+        });
+
+        modal.style.display = "block";
       }
 
       function displaySelectedRoster() {
         const selectedMonth = document.getElementById("monthSelector").value;
+        const rosterData = JSON.parse(localStorage.getItem(selectedMonth));
+        editedRosterData = rosterData;
         const previousRosterContent = document.getElementById(
           "previousRosterContent"
         );
-        previousRosterContent.innerHTML = "";
-        if (selectedMonth) {
-          const rosterData = JSON.parse(localStorage.getItem(selectedMonth));
-          if (rosterData) {
-            const table = document.createElement("table");
-            table.innerHTML = `
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Day</th>
-                                <th>Quintin</th>
-                                <th>Salomie</th>
-                                <th>Magnolia</th>
-                                <th>Andre</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rosterData
-                              .map(
-                                (row) => `
-                                <tr>
-                                    <td><input type="date" value="${
-                                      row.date
-                                    }" disabled></td>
-                                    <td><select disabled>${days
-                                      .map(
-                                        (day, index) =>
-                                          `<option value="${index}" ${
-                                            index == row.day ? "selected" : ""
-                                          }>${day}</option>`
-                                      )
-                                      .join("")}</select></td>
-                                    ${row.shifts
-                                      .map(
-                                        (shift) =>
-                                          `<td class="${shift.toLowerCase()}">${shift}</td>`
-                                      )
-                                      .join("")}
-                                </tr>
-                            `
-                              )
-                              .join("")}
-                        </tbody>
-                    `;
-            previousRosterContent.appendChild(table);
-          }
-        }
+        previousRosterContent.innerHTML = `
+          <h3>${selectedMonth}</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Day</th>
+                <th>Quintin</th>
+                <th>Salomie</th>
+                <th>Magnolia</th>
+                <th>Andre</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rosterData
+                .map(
+                  (data) => `
+                  <tr>
+                    <td>${data.date}</td>
+                    <td>${days[data.day]}</td>
+                    ${data.status
+                      .map(
+                        (status) =>
+                          `<td class="${status.toLowerCase()}">${status}</td>`
+                      )
+                      .join("")}
+                  </tr>
+                `
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `;
       }
 
       function editRoster() {
-        editedRosterData = [];
         const selectedMonth = document.getElementById("monthSelector").value;
-        const previousRosterContent = document.getElementById(
-          "previousRosterContent"
-        );
-        previousRosterContent
-          .querySelectorAll("input, select")
-          .forEach((el) => {
-            el.disabled = false;
-          });
-        previousRosterContent.querySelectorAll("tbody tr").forEach((row) => {
-          const rowData = {
-            date: row.cells[0].firstElementChild.value,
-            day: row.cells[1].firstElementChild.value,
-            shifts: Array.from(row.cells)
-              .slice(2)
-              .map((cell) => cell.textContent),
-          };
-          editedRosterData.push(rowData);
-        });
+        if (selectedMonth) {
+          currentMonth = selectedMonth;
+          loadCurrentRoster();
+          document.getElementById("previousRostersModal").style.display =
+            "none";
+        }
       }
 
       function saveEditedRoster() {
-        const selectedMonth = document.getElementById("monthSelector").value;
-        const previousRosterContent = document.getElementById(
-          "previousRosterContent"
-        );
-        editedRosterData.forEach((row, rowIndex) => {
-          row.date =
-            previousRosterContent.querySelectorAll("tbody tr")[
-              rowIndex
-            ].cells[0].firstElementChild.value;
-          row.day =
-            previousRosterContent.querySelectorAll("tbody tr")[
-              rowIndex
-            ].cells[1].firstElementChild.value;
-          row.shifts = Array.from(
-            previousRosterContent.querySelectorAll("tbody tr")[rowIndex].cells
-          )
-            .slice(2)
-            .map((cell) => cell.textContent);
-        });
-        localStorage.setItem(selectedMonth, JSON.stringify(editedRosterData));
-        alert("Edited roster saved successfully.");
+        saveCurrentRoster();
+        document.getElementById("previousRostersModal").style.display = "none";
       }
 
       function deleteRoster() {
         const selectedMonth = document.getElementById("monthSelector").value;
         if (selectedMonth) {
           localStorage.removeItem(selectedMonth);
-          document.getElementById("monthSelector").selectedIndex = 0;
-          document.getElementById("previousRosterContent").innerHTML = "";
-          alert(`Roster for ${selectedMonth} has been deleted.`);
-          showPreviousRosters(); // Refresh the month selector
+          alert("Roster deleted!");
+          showPreviousRosters();
         }
       }
 
-      function convertToPdf() {
+      function deleteAllRosterData() {
+        if (
+          confirm(
+            "Are you sure you want to delete all roster data? This action cannot be undone."
+          )
+        ) {
+          localStorage.clear();
+          alert("All roster data deleted!");
+        }
+      }
+
+      async function convertToPdf() {
+        const { jsPDF } = window.jspdf;
         const selectedMonth = document.getElementById("monthSelector").value;
         const previousRosterContent = document.getElementById(
           "previousRosterContent"
         );
-        const doc = new jspdf.jsPDF();
-        doc.text(`Roster for ${selectedMonth}`, 10, 10);
+
+        const doc = new jsPDF();
+        doc.text(selectedMonth, 10, 10);
+
+        const tableData = Array.from(
+          previousRosterContent.querySelector("table").rows
+        ).map((row) => Array.from(row.cells).map((cell) => cell.textContent));
+
         doc.autoTable({
-          html: previousRosterContent.querySelector("table"),
-          startY: 20,
+          head: [tableData[0]],
+          body: tableData.slice(1),
         });
-        doc.save(`Roster_${selectedMonth}.pdf`);
+
+        doc.save(`${selectedMonth}.pdf`);
       }
 
-      function deleteAllRosterData() {
-        if (confirm("Are you sure you want to delete all roster data?")) {
-          localStorage.clear();
-          document.getElementById("currentMonth").textContent = "";
-          document.getElementById("rosterBody").innerHTML = "";
-          alert("All roster data has been deleted.");
-        }
-      }
-
-      window.onload = initializeApp;
+      initializeApp();
     </script>
   </body>
 </html>
+
