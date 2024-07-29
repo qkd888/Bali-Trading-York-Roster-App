@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shift Roster Manager</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      h1,
+      h2 {
+        color: #333;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      .work {
+        background-color: #4caf50;
+        color: white;
+      }
+      .off {
+        background-color: #f44336;
+        color: white;
+      }
+      .button {
+        margin: 5px;
+        padding: 10px 15px;
+        cursor: pointer;
+        background-color: #008cba;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      .button:hover {
+        background-color: #005f7f;
+      }
+      .button-delete {
+        background-color: #f44336;
+      }
+      .button-delete:hover {
+        background-color: #d32f2f;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.4);
+      }
+      .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 1000px;
+      }
+      .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+      }
+      .close:hover,
+      .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      #monthSelector {
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Bali Trading York Street Shift Roster Manager</h1>
+    <button id="newMonthBtn" class="button">Add New Month</button>
+    <button id="saveBtn" class="button">Save Current Roster</button>
+    <div id="currentRoster">
+      <h2 id="currentMonth"></h2>
+      <table id="rosterTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Day</th>
+            <th>Quintin</th>
+            <th>Salomie</th>
+            <th>Magnolia</th>
+            <th>Andre</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="rosterBody"></tbody>
+      </table>
+      <button id="addRowBtn" class="button">Add New Row</button>
+    </div>
+    <div>
+      <h2>Previous Rosters</h2>
+      <button id="showPreviousBtn" class="button">Show Previous Rosters</button>
+      <button id="deleteAllBtn" class="button button-delete">
+        Delete All Roster Data
+      </button>
+    </div>
+    <div id="previousRostersModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Previous Rosters</h2>
+        <select id="monthSelector"></select>
+        <div id="previousRosterContent"></div>
+        <button id="editRosterBtn" class="button">Edit Roster</button>
+        <button id="saveEditedRosterBtn" class="button">
+          Save Edited Roster
+        </button>
+        <button id="deleteRosterBtn" class="button button-delete">
+          Delete Roster
+        </button>
+        <button id="convertPdfBtn" class="button">Convert to PDF</button>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.0/jspdf.umd.min.js"></script>
+    <script>
+      const employees = ["Salomie", "Magnolia", "Andre", "Quintin"];
+      const days = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+      ];
+      let currentMonth = "";
+      let editedRosterData = [];
+
+      function initializeApp() {
+        document
+          .getElementById("newMonthBtn")
+          .addEventListener("click", startNewMonth);
+        document
+          .getElementById("saveBtn")
+          .addEventListener("click", saveCurrentRoster);
+        document
+          .getElementById("showPreviousBtn")
+          .addEventListener("click", showPreviousRosters);
+        document
+          .getElementById("deleteAllBtn")
+          .addEventListener("click", deleteAllRosterData);
+        document.getElementById("addRowBtn").addEventListener("click", addRow);
+        document
+          .getElementById("monthSelector")
+          .addEventListener("change", displaySelectedRoster);
+        document
+          .getElementById("editRosterBtn")
+          .addEventListener("click", editRoster);
+        document
+          .getElementById("saveEditedRosterBtn")
+          .addEventListener("click", saveEditedRoster);
+        document
+          .getElementById("convertPdfBtn")
+          .addEventListener("click", convertToPdf);
+        document
+          .getElementById("deleteRosterBtn")
+          .addEventListener("click", deleteRoster);
+
+        const modal = document.getElementById("previousRostersModal");
+        const span = document.getElementsByClassName("close")[0];
+        span.onclick = () => (modal.style.display = "none");
+        window.onclick = (event) => {
+          if (event.target == modal) {
+            modal.style.display = "none";
+          }
+        };
+
+        loadCurrentRoster();
+      }
+
+      function startNewMonth() {
+        currentMonth = prompt("Enter the month and year (e.g., July 2024):");
+        if (currentMonth) {
+          const [month, year] = currentMonth.split(" ");
+          const monthIndex = new Date(
+            Date.parse(month + " 1, 2012")
+          ).getMonth();
+          populateRoster(monthIndex, parseInt(year));
+          document.getElementById("currentMonth").textContent = currentMonth;
+        }
+      }
+
+      function populateRoster(monthIndex, year) {
+        document.getElementById("rosterBody").innerHTML = "";
+        const totalDays = new Date(year, monthIndex + 1, 0).getDate();
+
+        for (let i = 1; i <= totalDays; i++) {
+          const date = new Date(year, monthIndex, i);
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td><input type="date" value="${
+                      date.toISOString().split("T")[0]
+                    }"></td>
+                    <td><select>${days
+                      .map(
+                        (day, index) =>
+                          `<option value="${index}" ${
+                            index === date.getDay() ? "selected" : ""
+                          }>${day}</option>`
+                      )
+                      .join("")}</select></td>
+                    ${employees
+                      .map(
+                        () =>
+                          `<td class="off" onclick="toggleStatus(this)">Off</td>`
+                      )
+                      .join("")}
+                    <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
+                `;
+          document.getElementById("rosterBody").appendChild(row);
+        }
+      }
+
+      function addRow() {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+                <td><input type="date" onchange="updateDay(this)"></td>
+                <td><select>${days
+                  .map(
+                    (day, index) => `<option value="${index}">${day}</option>`
+                  )
+                  .join("")}</select></td>
+                ${employees
+                  .map(
+                    () =>
+                      `<td class="off" onclick="toggleStatus(this)">Off</td>`
+                  )
+                  .join("")}
+                <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
+            `;
+        document.getElementById("rosterBody").appendChild(row);
+      }
+
+      function updateDay(input) {
+        const date = new Date(input.value);
+        const daySelect =
+          input.parentElement.nextElementSibling.firstElementChild;
+        daySelect.value = date.getDay();
+      }
+
+      function toggleStatus(cell) {
+        cell.classList.toggle("off");
+        cell.classList.toggle("work");
+        cell.textContent = cell.classList.contains("work") ? "Work" : "Off";
+      }
+
+      function removeRow(button) {
+        button.parentElement.parentElement.remove();
+      }
+
+      function saveCurrentRoster() {
+        if (!currentMonth) {
+          alert("Please start a new month first.");
+          return;
+        }
+        const rosterData = Array.from(
+          document.getElementById("rosterBody").children
+        ).map((row) => ({
+          date: row.cells[0].firstElementChild.value,
+          day: row.cells[1].firstElementChild.value,
+          shifts: Array.from(row.cells)
+            .slice(2, 6)
+            .map((cell) => cell.textContent),
+        }));
+        localStorage.setItem(currentMonth, JSON.stringify(rosterData));
+        alert("Roster saved successfully.");
+      }
+
+      function loadCurrentRoster() {
+        const savedCurrentMonth = localStorage.getItem("currentMonth");
+        if (savedCurrentMonth) {
+          currentMonth = savedCurrentMonth;
+          document.getElementById("currentMonth").textContent = currentMonth;
+          const rosterData = JSON.parse(localStorage.getItem(currentMonth));
+          if (rosterData) {
+            document.getElementById("rosterBody").innerHTML = "";
+            rosterData.forEach((row) => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                            <td><input type="date" value="${row.date}"></td>
+                            <td><select>${days
+                              .map(
+                                (day, index) =>
+                                  `<option value="${index}" ${
+                                    index == row.day ? "selected" : ""
+                                  }>${day}</option>`
+                              )
+                              .join("")}</select></td>
+                            ${row.shifts
+                              .map(
+                                (shift) =>
+                                  `<td class="${shift.toLowerCase()}" onclick="toggleStatus(this)">${shift}</td>`
+                              )
+                              .join("")}
+                            <td><button class="button button-delete" onclick="removeRow(this)">Delete</button></td>
+                        `;
+              document.getElementById("rosterBody").appendChild(tr);
+            });
+          }
+        }
+      }
+
+      function showPreviousRosters() {
+        const modal = document.getElementById("previousRostersModal");
+        modal.style.display = "block";
+        const monthSelector = document.getElementById("monthSelector");
+        monthSelector.innerHTML = "";
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key !== "currentMonth") {
+            const option = document.createElement("option");
+            option.value = key;
+            option.textContent = key;
+            monthSelector.appendChild(option);
+          }
+        }
+        displaySelectedRoster();
+      }
+
+      function displaySelectedRoster() {
+        const selectedMonth = document.getElementById("monthSelector").value;
+        const previousRosterContent = document.getElementById(
+          "previousRosterContent"
+        );
+        previousRosterContent.innerHTML = "";
+        if (selectedMonth) {
+          const rosterData = JSON.parse(localStorage.getItem(selectedMonth));
+          if (rosterData) {
+            const table = document.createElement("table");
+            table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Day</th>
+                                <th>Quintin</th>
+                                <th>Salomie</th>
+                                <th>Magnolia</th>
+                                <th>Andre</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rosterData
+                              .map(
+                                (row) => `
+                                <tr>
+                                    <td><input type="date" value="${
+                                      row.date
+                                    }" disabled></td>
+                                    <td><select disabled>${days
+                                      .map(
+                                        (day, index) =>
+                                          `<option value="${index}" ${
+                                            index == row.day ? "selected" : ""
+                                          }>${day}</option>`
+                                      )
+                                      .join("")}</select></td>
+                                    ${row.shifts
+                                      .map(
+                                        (shift) =>
+                                          `<td class="${shift.toLowerCase()}">${shift}</td>`
+                                      )
+                                      .join("")}
+                                </tr>
+                            `
+                              )
+                              .join("")}
+                        </tbody>
+                    `;
+            previousRosterContent.appendChild(table);
+          }
+        }
+      }
+
+      function editRoster() {
+        editedRosterData = [];
+        const selectedMonth = document.getElementById("monthSelector").value;
+        const previousRosterContent = document.getElementById(
+          "previousRosterContent"
+        );
+        previousRosterContent
+          .querySelectorAll("input, select")
+          .forEach((el) => {
+            el.disabled = false;
+          });
+        previousRosterContent.querySelectorAll("tbody tr").forEach((row) => {
+          const rowData = {
+            date: row.cells[0].firstElementChild.value,
+            day: row.cells[1].firstElementChild.value,
+            shifts: Array.from(row.cells)
+              .slice(2)
+              .map((cell) => cell.textContent),
+          };
+          editedRosterData.push(rowData);
+        });
+      }
+
+      function saveEditedRoster() {
+        const selectedMonth = document.getElementById("monthSelector").value;
+        const previousRosterContent = document.getElementById(
+          "previousRosterContent"
+        );
+        editedRosterData.forEach((row, rowIndex) => {
+          row.date =
+            previousRosterContent.querySelectorAll("tbody tr")[
+              rowIndex
+            ].cells[0].firstElementChild.value;
+          row.day =
+            previousRosterContent.querySelectorAll("tbody tr")[
+              rowIndex
+            ].cells[1].firstElementChild.value;
+          row.shifts = Array.from(
+            previousRosterContent.querySelectorAll("tbody tr")[rowIndex].cells
+          )
+            .slice(2)
+            .map((cell) => cell.textContent);
+        });
+        localStorage.setItem(selectedMonth, JSON.stringify(editedRosterData));
+        alert("Edited roster saved successfully.");
+      }
+
+      function deleteRoster() {
+        const selectedMonth = document.getElementById("monthSelector").value;
+        if (selectedMonth) {
+          localStorage.removeItem(selectedMonth);
+          document.getElementById("monthSelector").selectedIndex = 0;
+          document.getElementById("previousRosterContent").innerHTML = "";
+          alert(`Roster for ${selectedMonth} has been deleted.`);
+          showPreviousRosters(); // Refresh the month selector
+        }
+      }
+
+      function convertToPdf() {
+        const selectedMonth = document.getElementById("monthSelector").value;
+        const previousRosterContent = document.getElementById(
+          "previousRosterContent"
+        );
+        const doc = new jspdf.jsPDF();
+        doc.text(`Roster for ${selectedMonth}`, 10, 10);
+        doc.autoTable({
+          html: previousRosterContent.querySelector("table"),
+          startY: 20,
+        });
+        doc.save(`Roster_${selectedMonth}.pdf`);
+      }
+
+      function deleteAllRosterData() {
+        if (confirm("Are you sure you want to delete all roster data?")) {
+          localStorage.clear();
+          document.getElementById("currentMonth").textContent = "";
+          document.getElementById("rosterBody").innerHTML = "";
+          alert("All roster data has been deleted.");
+        }
+      }
+
+      window.onload = initializeApp;
+    </script>
+  </body>
+</html>
